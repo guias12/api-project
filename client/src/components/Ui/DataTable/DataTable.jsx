@@ -1,6 +1,6 @@
 const DataTable = ({ data }) => (
   <div>
-    <h3>📋 Tabela de Dados</h3>
+    <h3>Tabela de Dados</h3>
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
         <tr style={{ backgroundColor: "#f2f2f2" }}>

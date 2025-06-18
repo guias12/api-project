@@ -8,14 +8,24 @@ const PORT = 3001;
 // Enable CORS
 app.use(cors());
 
-// Stock data endpoint
 app.get("/api/stocks", async (req, res) => {
   try {
     const symbols = [
-      'PETR4.SA', 'VALE3.SA', 'ITUB4.SA', 'BBDC4.SA',
-      'BBAS3.SA', 'B3SA3.SA', 'ABEV3.SA', 'WEGE3.SA',
-      'RENT3.SA', 'SUZB3.SA', 'ELET3.SA', 'GGBR4.SA',
-      'RAIL3.SA', 'HAPV3.SA', 'LREN3.SA'
+      "PETR4.SA",
+      "VALE3.SA",
+      "ITUB4.SA",
+      "BBDC4.SA",
+      "BBAS3.SA",
+      "B3SA3.SA",
+      "ABEV3.SA",
+      "WEGE3.SA",
+      "RENT3.SA",
+      "SUZB3.SA",
+      "ELET3.SA",
+      "GGBR4.SA",
+      "RAIL3.SA",
+      "HAPV3.SA",
+      "LREN3.SA",
     ];
     const quotes = await yahooFinance.quote(symbols);
 
@@ -24,6 +34,7 @@ app.get("/api/stocks", async (req, res) => {
       price: stock.regularMarketPrice,
       change: stock.regularMarketChange,
       changePercent: stock.regularMarketChangePercent,
+      name: getStockCompanyName(stock.symbol.replace(".SA", "")),
     }));
 
     res.json(formattedData);
@@ -33,7 +44,6 @@ app.get("/api/stocks", async (req, res) => {
   }
 });
 
-// Commodity data endpoint
 app.get("/api/commodities", async (req, res) => {
   try {
     const commoditySymbols = [
@@ -56,6 +66,7 @@ app.get("/api/commodities", async (req, res) => {
       change: commodity.regularMarketChange,
       changePercent: commodity.regularMarketChangePercent,
       currency: "USD",
+      symbol: commodity.symbol,
     }));
 
     res.json(formattedData);
@@ -79,6 +90,28 @@ function getCommodityName(symbol) {
     "KC=F": "Café",
   };
   return map[symbol] || symbol.replace("=F", "");
+}
+
+function getStockCompanyName(symbol) {
+  const map = {
+    PETR4: "Petrobras",
+    VALE3: "Vale",
+    ITUB4: "Itaú Unibanco",
+    BBDC4: "Bradesco",
+    BBAS3: "Banco do Brasil",
+    B3SA3: "B3 (Bolsa Brasileira)",
+    ABEV3: "Ambev",
+    WEGE3: "WEG",
+    RENT3: "Localiza",
+    SUZB3: "Suzano Papel e Celulose",
+    ELET3: "Eletrobras",
+    GGBR4: "Gerdau",
+    RAIL3: "Rumo Logística",
+    HAPV3: "Hapvida",
+    LREN3: "Lojas Renner",
+  };
+
+  return map[symbol];
 }
 
 app.listen(PORT, () => {

@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from "react";
 import {
-  BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend
-} from 'recharts';
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
 import {
-  CircularProgress,
-  Alert,
   Table,
   TableBody,
   TableCell,
@@ -13,109 +16,93 @@ import {
   TableHead,
   TableRow,
   Paper,
+  Autocomplete,
+  Chip,
+  Box,
   TextField,
-  MenuItem
-} from '@mui/material';
-import { COLORS, TOP_CURRENCIES } from '../../../constants/constants';
+} from "@mui/material";
+import { TOP_CURRENCIES } from "../../../constants/constants";
 
 const ChartContainer = ({ children, title }) => (
-  <div style={{ margin: '40px 0', padding: '20px', border: '1px solid #eee', borderRadius: '8px' }}>
-    <h3 style={{ marginBottom: '20px', color: '#333' }}>{title}</h3>
+  <div
+    style={{
+      margin: "40px 0",
+      padding: "20px",
+      border: "1px solid #eee",
+      borderRadius: "8px",
+    }}
+  >
+    <h3 style={{ marginBottom: "20px", color: "#333" }}>{title}</h3>
     {children}
   </div>
 );
 
-const MoedaComponent = ({ exchangeRates }) => {
-  const [filteredMoedas, setFilteredMoedas] = useState([]);
-  const [currencyFilter, setCurrencyFilter] = useState('all');
-  const [lastUpdated, setLastUpdated] = useState('');
+const MoedaComponent = ({ data }) => {
+  const [filteredCurrencies, setFilteredCurrencies] = useState([]);
+  const [selectedCurrencies, setSelectedCurrencies] = useState(
+    Object.keys(TOP_CURRENCIES)
+  );
 
   useEffect(() => {
-    if (exchangeRates) {
-      // Filter only the top currencies we want to display
-      const topCurrenciesData = Object.entries(exchangeRates)
-        .filter(([code]) => TOP_CURRENCIES[code])
-        .map(([code, rate]) => ({
-          code,
-          name: TOP_CURRENCIES[code],
-          rate,
-          change: 0, // Note: exchangerate-api.com v4 doesn't provide change data
-          changePercent: 0
-        }));
-
-      setFilteredMoedas(topCurrenciesData);
-      setLastUpdated(new Date().toLocaleTimeString());
+    if (data) {
+      const filtered = data.filter((item) =>
+        selectedCurrencies.includes(item.code)
+      );
+      setFilteredCurrencies(filtered);
     }
-  }, [exchangeRates]);
-
-  useEffect(() => {
-    if (exchangeRates) {
-      if (currencyFilter === 'all') {
-        const allTopCurrencies = Object.entries(exchangeRates)
-          .filter(([code]) => TOP_CURRENCIES[code])
-          .map(([code, rate]) => ({
-            code,
-            name: TOP_CURRENCIES[code],
-            rate,
-            change: 0,
-            changePercent: 0
-          }));
-        setFilteredMoedas(allTopCurrencies);
-      } else {
-        const filtered = {
-          code: currencyFilter,
-          name: TOP_CURRENCIES[currencyFilter],
-          rate: exchangeRates[currencyFilter],
-          change: 0,
-          changePercent: 0
-        };
-        setFilteredMoedas([filtered]);
-      }
-    }
-  }, [currencyFilter, exchangeRates]);
-
-  if (!exchangeRates) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-        <CircularProgress size={60} />
-      </div>
-    );
-  }
+  }, [selectedCurrencies, data]);
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h2 style={{ marginBottom: '30px', color: '#1976d2' }}>💱 Currency Dashboard</h2>
-      <p style={{ color: '#666', marginBottom: '20px' }}>Last updated: {lastUpdated}</p>
+    <div style={{ padding: "20px" }}>
+      <h2 style={{ marginBottom: "30px", color: "#1976d2" }}>
+        Currency Dashboard
+      </h2>
 
-      <div style={{ marginBottom: '30px' }}>
-        <TextField
-          select
-          label="Filter Currency"
-          value={currencyFilter}
-          onChange={(e) => setCurrencyFilter(e.target.value)}
-          style={{ width: '300px' }}
-        >
-          <MenuItem value="all">All Currencies</MenuItem>
-          {Object.entries(TOP_CURRENCIES).map(([code, name]) => (
-            <MenuItem key={code} value={code}>
-              {name} ({code})
-            </MenuItem>
-          ))}
-        </TextField>
-      </div>
+      <Box sx={{ marginBottom: 4 }}>
+        <Autocomplete
+          multiple
+          options={Object.keys(TOP_CURRENCIES)}
+          getOptionLabel={(option) => `${TOP_CURRENCIES[option]} (${option})`}
+          value={selectedCurrencies}
+          onChange={(_, newValue) => setSelectedCurrencies(newValue)}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Select Currencies"
+              placeholder="Currencies"
+            />
+          )}
+          renderTags={(value, getTagProps) =>
+            value.map((option, index) => (
+              <Chip
+                label={`${TOP_CURRENCIES[option]} (${option})`}
+                {...getTagProps({ index })}
+                key={option}
+              />
+            ))
+          }
+          style={{ width: "100%" }}
+        />
+      </Box>
 
-      <ChartContainer title="📍 Exchange Rates (1 USD = X)">
+      <ChartContainer title="Exchange Rates (1 USD = X)">
         <BarChart
           width={800}
           height={400}
-          data={filteredMoedas}
+          data={filteredCurrencies}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="code" />
-          <YAxis />
+          <YAxis
+            label={{
+              value: "Exchange Rate",
+              angle: -90,
+              position: "insideLeft",
+            }}
+          />
           <Tooltip
-            formatter={(value) => [value.toFixed(4), 'Exchange Rate']}
+            formatter={(value) => [value.toFixed(4), "Exchange Rate"]}
             labelFormatter={(code) => TOP_CURRENCIES[code] || code}
           />
           <Legend />
@@ -123,25 +110,29 @@ const MoedaComponent = ({ exchangeRates }) => {
         </BarChart>
       </ChartContainer>
 
-      <ChartContainer title="📋 Currency Data">
+      <ChartContainer title="Currency Data">
         <TableContainer component={Paper} elevation={3}>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 'bold' }}>Currency</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }} align="right">Code</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }} align="right">1 USD Equals</TableCell>
+              <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+                <TableCell sx={{ fontWeight: "bold" }}>Currency</TableCell>
+                <TableCell sx={{ fontWeight: "bold" }} align="right">
+                  Code
+                </TableCell>
+                <TableCell sx={{ fontWeight: "bold" }} align="right">
+                  1 USD Equals
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredMoedas.map((moeda) => (
-                <TableRow key={moeda.code}>
+              {filteredCurrencies.map((currency) => (
+                <TableRow key={currency.code}>
                   <TableCell component="th" scope="row">
-                    {moeda.name}
+                    {currency.name}
                   </TableCell>
-                  <TableCell align="right">{moeda.code}</TableCell>
+                  <TableCell align="right">{currency.code}</TableCell>
                   <TableCell align="right">
-                    {moeda.rate.toFixed(4)}
+                    {currency.rate.toFixed(4)}
                   </TableCell>
                 </TableRow>
               ))}

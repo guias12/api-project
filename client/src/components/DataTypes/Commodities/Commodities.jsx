@@ -1,12 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -14,8 +9,6 @@ import {
   Legend,
 } from "recharts";
 import {
-  CircularProgress,
-  Alert,
   Table,
   TableBody,
   TableCell,
@@ -23,8 +16,12 @@ import {
   TableHead,
   TableRow,
   Paper,
+  Autocomplete,
+  Chip,
+  Box,
+  TextField,
 } from "@mui/material";
-import { COLORS } from "../../../constants/constants";
+import { TOP_COMMODITIES } from "../../../constants/constants";
 
 const ChartContainer = ({ children, title }) => (
   <div
@@ -40,178 +37,118 @@ const ChartContainer = ({ children, title }) => (
   </div>
 );
 
-const CommoditiesComponent = () => {
-  const [commodities, setCommodities] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const CommoditiesComponent = ({ data }) => {
+  const [filteredCommodities, setFilteredCommodities] = useState([]);
+  const [selectedCommodities, setSelectedCommodities] =
+    useState(TOP_COMMODITIES);
 
   useEffect(() => {
-    const fetchCommoditiesData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch("http://localhost:3001/api/commodities");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setCommodities(data);
-      } catch (err) {
-        console.error("Error fetching commodities:", err);
-        setError("Failed to load commodities data. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCommoditiesData();
-    const interval = setInterval(fetchCommoditiesData, 5 * 60 * 1000); // Refresh every 5 minutes
-
-    return () => clearInterval(interval);
-  }, []);
-
-  if (loading) {
-    return (
-      <div
-        style={{ display: "flex", justifyContent: "center", padding: "40px" }}
-      >
-        <CircularProgress size={60} />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Alert severity="error" style={{ margin: "20px" }}>
-        {error}
-      </Alert>
-    );
-  }
-
-  if (!commodities || commodities.length === 0) {
-    return (
-      <Alert severity="warning" style={{ margin: "20px" }}>
-        No commodities data available.
-      </Alert>
-    );
-  }
+    if (data) {
+      const filtered = data.filter((item) =>
+        selectedCommodities.includes(item.symbol)
+      );
+      setFilteredCommodities(filtered);
+    }
+  }, [selectedCommodities, data]);
 
   return (
     <div style={{ padding: "20px" }}>
       <h2 style={{ marginBottom: "30px", color: "#1976d2" }}>
-        📈 Commodities Dashboard
+        Commodities Dashboard
       </h2>
 
-      <ChartContainer title="Current Prices (Bar Chart)">
+      <Box sx={{ marginBottom: 4 }}>
+        <Autocomplete
+          multiple
+          options={TOP_COMMODITIES}
+          getOptionLabel={(option) =>
+            `${
+              data.find((c) => c.symbol === option)?.name || option
+            } (${option})`
+          }
+          value={selectedCommodities}
+          onChange={(_, newValue) => setSelectedCommodities(newValue)}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Select Commodities"
+              placeholder="Commodities"
+            />
+          )}
+          renderTags={(value, getTagProps) =>
+            value.map((option, index) => (
+              <Chip
+                label={`${
+                  data.find((c) => c.symbol === option)?.name || option
+                } (${option})`}
+                {...getTagProps({ index })}
+                key={option}
+              />
+            ))
+          }
+          style={{ width: "100%" }}
+        />
+      </Box>
+
+      <ChartContainer title="Current Prices (USD)">
         <BarChart
           width={800}
           height={400}
-          data={commodities}
+          data={filteredCommodities}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
         >
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip formatter={(value) => [`$${value}`, "Price"]} />
+          <XAxis
+            dataKey="symbol"
+            tickFormatter={(symbol) =>
+              data.find((c) => c.symbol === symbol)?.name || symbol
+            }
+          />
+          <YAxis
+            label={{ value: "Price (USD)", angle: -90, position: "insideLeft" }}
+          />
+          <Tooltip
+            formatter={(value) => [`$${value.toFixed(2)}`, "Price"]}
+            labelFormatter={(symbol) =>
+              data.find((c) => c.symbol === symbol)?.name || symbol
+            }
+          />
           <Legend />
-          <Bar dataKey="price" fill="#1976d2" name="Price (USD)" />
+          <Bar dataKey="price" fill="#1976d2" name="Price" />
         </BarChart>
       </ChartContainer>
 
-      <ChartContainer title="Price Changes (Line Chart)">
-        <LineChart
-          width={800}
-          height={400}
-          data={commodities}
-          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip formatter={(value) => [`${value}%`, "Change"]} />
-          <Legend />
-          <Line
-            type="monotone"
-            dataKey="changePercent"
-            stroke="#ff7300"
-            name="Change (%)"
-            activeDot={{ r: 8 }}
-          />
-        </LineChart>
-      </ChartContainer>
-
-      <ChartContainer title="Market Distribution (Pie Chart)">
-        <PieChart width={800} height={400}>
-          <Pie
-            data={commodities}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            outerRadius={150}
-            fill="#8884d8"
-            dataKey="price"
-            nameKey="name"
-            label={({ name, percent }) =>
-              `${name}: ${(percent * 100).toFixed(0)}%`
-            }
-          >
-            {commodities.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={COLORS[index % COLORS.length]}
-              />
-            ))}
-          </Pie>
-          <Tooltip formatter={(value) => [`$${value}`, "Price"]} />
-          <Legend />
-        </PieChart>
-      </ChartContainer>
-
-      <ChartContainer title="Detailed Commodities Data">
+      <ChartContainer title="Commodities Data">
         <TableContainer component={Paper} elevation={3}>
           <Table>
             <TableHead>
               <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
                 <TableCell sx={{ fontWeight: "bold" }}>Commodity</TableCell>
                 <TableCell sx={{ fontWeight: "bold" }} align="right">
+                  Symbol
+                </TableCell>
+                <TableCell sx={{ fontWeight: "bold" }} align="right">
                   Price (USD)
                 </TableCell>
                 <TableCell sx={{ fontWeight: "bold" }} align="right">
-                  Change
-                </TableCell>
-                <TableCell sx={{ fontWeight: "bold" }} align="right">
-                  Change %
+                  Change (%)
                 </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {commodities.map((row) => (
-                <TableRow key={row.name}>
+              {filteredCommodities.map((item) => (
+                <TableRow key={item.symbol}>
                   <TableCell component="th" scope="row">
-                    {row.name}
+                    {item.name}
                   </TableCell>
-                  <TableCell align="right">
-                    $
-                    {row.price.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </TableCell>
+                  <TableCell align="right">{item.symbol}</TableCell>
+                  <TableCell align="right">${item.price.toFixed(2)}</TableCell>
                   <TableCell
                     align="right"
-                    sx={{ color: row.change >= 0 ? "green" : "red" }}
+                    sx={{ color: item.changePercent >= 0 ? "green" : "red" }}
                   >
-                    {row.change >= 0 ? "+" : ""}
-                    {row.change.toFixed(2)}
-                  </TableCell>
-                  <TableCell
-                    align="right"
-                    sx={{ color: row.changePercent >= 0 ? "green" : "red" }}
-                  >
-                    {row.changePercent >= 0 ? "+" : ""}
-                    {row.changePercent.toFixed(2)}%
+                    {item.changePercent >= 0 ? "+" : ""}
+                    {item.changePercent.toFixed(2)}%
                   </TableCell>
                 </TableRow>
               ))}

@@ -1,115 +1,164 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { Tabs, Tab, Box } from "@mui/material";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import FilterControls from "./components/Ui/FilterControls/FilterControls";
+import { Tabs, Tab, Box, CircularProgress, Alert } from "@mui/material";
 import TabPanel from "./components/Ui/TabPanel/TabPanel";
 import ExportButton from "./components/Ui/ExportButton/ExportButton";
-import TodosComponent from "./components/DataTypes/Todos/Todos";
 import MoedasComponent from "./components/DataTypes/Moedas/Moedas";
 import CriptomoedasComponent from "./components/DataTypes/Crypto/Crypto";
 import AcoesComponent from "./components/DataTypes/Acoes/Acoes";
 import CommoditiesComponent from "./components/DataTypes/Commodities/Commodities";
+import { TOP_CURRENCIES, TOP_CRYPTOS } from "./constants/constants";
 
 function App() {
-  const [dados, setDados] = useState([]);
-  const [filtroTexto, setFiltroTexto] = useState("");
-  const [filtrados, setFiltrados] = useState([]);
   const [tabValue, setTabValue] = useState(0);
-  const [rates, setRates] = useState([])
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [data, setData] = useState({
+    currencies: [],
+    cryptos: [],
+    stocks: [],
+    commodities: [],
+  });
 
   useEffect(() => {
-    const buscarDados = async () => {
-      const moedasRes = await axios.get(
-        "https://api.exchangerate-api.com/v4/latest/USD"
-      );
-      setRates(moedasRes.data.rates)
-      const moedas = Object.entries(moedasRes.data.rates)
-        .slice(0, 10)
-        .map(([nome, valor]) => ({
-          nome,
-          valor,
-          tipo: "moeda",
-        }));
+    const fetchAllData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const criptoRes = await axios.get(
-        "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=10&page=1"
-      );
-      const criptos = criptoRes.data.map((c) => ({
-        nome: c.name,
-        valor: c.current_price,
-        tipo: "cripto",
-      }));
+        const [currenciesRes, cryptosRes, stocksRes, commoditiesRes] =
+          await Promise.all([
+            fetch("https://api.exchangerate-api.com/v4/latest/USD"),
+            fetch(
+              `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${TOP_CRYPTOS.join(
+                ","
+              )}`
+            ),
+            fetch("http://localhost:3001/api/stocks"),
+            fetch("http://localhost:3001/api/commodities"),
+          ]);
 
-      const todos = [...moedas, ...criptos];
-      setDados(todos);
-      setFiltrados(todos);
+        if (
+          !currenciesRes.ok ||
+          !cryptosRes.ok ||
+          !stocksRes.ok ||
+          !commoditiesRes.ok
+        ) {
+          throw new Error("Failed to fetch some data");
+        }
+
+        const currenciesData = await currenciesRes.json();
+        const cryptosData = await cryptosRes.json();
+        const stocksData = await stocksRes.json();
+        const commoditiesData = await commoditiesRes.json();
+
+        setData({
+          currencies: Object.entries(currenciesData.rates)
+            .filter(([code]) => TOP_CURRENCIES[code])
+            .map(([code, rate]) => ({
+              code,
+              name: TOP_CURRENCIES[code],
+              rate,
+              type: "currency",
+            })),
+          cryptos: cryptosData.map((crypto) => ({
+            id: crypto.id,
+            symbol: crypto.symbol.toUpperCase(),
+            name: crypto.name,
+            price: crypto.current_price,
+            change: crypto.price_change_24h,
+            changePercent: crypto.price_change_percentage_24h,
+            type: "crypto",
+          })),
+          stocks: stocksData.map((stock) => ({
+            symbol: stock.symbol,
+            name: stock.name,
+            price: stock.price,
+            change: stock.change,
+            changePercent: stock.changePercent,
+            type: "stock",
+          })),
+          commodities: commoditiesData.map((item) => ({
+            symbol: item.symbol,
+            name: item.name,
+            price: item.price,
+            change: item.change,
+            changePercent: item.changePercent,
+            type: "commodity",
+          })),
+        });
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        setError("Failed to load financial data. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
     };
 
-    buscarDados();
+    fetchAllData();
+    const interval = setInterval(fetchAllData, 5 * 60 * 1000); // Refresh every 5 minutes
+    return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    let filtragem = [...dados];
-    if (filtroTexto.trim() !== "") {
-      filtragem = filtragem.filter((item) =>
-        item.nome.toLowerCase().includes(filtroTexto.toLowerCase())
-      );
-    }
-    setFiltrados(filtragem);
-  }, [filtroTexto, dados]);
-
-  const exportarPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Dados Financeiros", 14, 10);
-    autoTable(doc, {
-      head: [["Nome", "Valor", "Tipo"]],
-      body: filtrados.map((item) => [item.nome, item.valor, item.tipo]),
-    });
-    doc.save("dados-financeiros.pdf");
-  };
-
-  const handleTabChange = (event, newValue) => {
+  const handleTabChange = (newValue) => {
     setTabValue(newValue);
   };
 
+  if (loading) {
+    return (
+      <div
+        style={{ display: "flex", justifyContent: "center", padding: "40px" }}
+      >
+        <CircularProgress size={60} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error" style={{ margin: "20px" }}>
+        {error}
+      </Alert>
+    );
+  }
+
   return (
     <div style={{ padding: 20 }}>
-      <h2>📊 Dashboard Financeiro</h2>
-
-      <FilterControls
-        filtroTexto={filtroTexto}
-        setFiltroTexto={setFiltroTexto}
-      />
+      <h2>Financial Dashboard</h2>
 
       <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
-          <Tab label="Todos" />
-          <Tab label="Moedas" />
-          <Tab label="Criptomoedas" />
-          <Tab label="Ações" />
+          <Tab label="Currencies" />
+          <Tab label="Cryptocurrencies" />
+          <Tab label="Stocks" />
           <Tab label="Commodities" />
         </Tabs>
       </Box>
 
       <TabPanel value={tabValue} index={0}>
-        <TodosComponent data={filtrados} />
+        <MoedasComponent data={data.currencies} />
       </TabPanel>
       <TabPanel value={tabValue} index={1}>
-        <MoedasComponent exchangeRates={rates} />
+        <CriptomoedasComponent data={data.cryptos} />
       </TabPanel>
       <TabPanel value={tabValue} index={2}>
-        <CriptomoedasComponent data={filtrados} />
+        <AcoesComponent data={data.stocks} />
       </TabPanel>
       <TabPanel value={tabValue} index={3}>
-        <AcoesComponent data={filtrados} />
-      </TabPanel>
-      <TabPanel value={tabValue} index={4}>
-        <CommoditiesComponent data={filtrados} />
+        <CommoditiesComponent data={data.commodities} />
       </TabPanel>
 
-      <ExportButton onClick={exportarPDF} />
+      <ExportButton
+        data={
+          tabValue === 0
+            ? data.currencies
+            : tabValue === 1
+            ? data.cryptos
+            : tabValue === 2
+            ? data.stocks
+            : data.commodities
+        }
+        tabIndex={tabValue}
+      />
     </div>
   );
 }
