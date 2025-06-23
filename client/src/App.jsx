@@ -95,12 +95,20 @@ function App() {
     };
 
     fetchAllData();
-    const interval = setInterval(fetchAllData, 5 * 60 * 1000); // Refresh every 5 minutes
+    const interval = setInterval(fetchAllData, 60 * 1000); // Refresh every minute
     return () => clearInterval(interval);
   }, []);
 
   const handleTabChange = (newValue) => {
-    setTabValue(newValue);
+    const map = {
+      Currencies: 0,
+      Cryptocurrencies: 1,
+      Stocks: 2,
+      Commodities: 3,
+    };
+
+    const tab = map[newValue.target.textContent];
+    setTabValue(tab);
   };
 
   if (loading) {
